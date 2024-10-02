@@ -10,3 +10,6 @@
 [submodule "modules/forge-std"]
 	path = modules/forge-std
 	url = git@github.com:foundry-rs/forge-std.git
+[submodule "modules/ironblocks/onchain-firewall"]
+	path = modules/ironblocks/onchain-firewall
+	url = https://github.com/ironblocks/onchain-firewall
