@@ -1,0 +1,2 @@
+
+@ironblocks/firewall-consumer/=lib/ironblocks/onchain-firewall/packages/firewall-consumer/
