@@ -13,3 +13,6 @@
 [submodule "modules/ironblocks/onchain-firewall"]
 	path = modules/ironblocks/onchain-firewall
 	url = https://github.com/ironblocks/onchain-firewall
+[submodule "modules/openzeppelin-contracts"]
+	path = modules/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
