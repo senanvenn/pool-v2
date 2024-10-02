@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.7;
 
+import {VennFirewallConsumer} from "@ironblocks/firewall-consumer/contracts/consumers/VennFirewallConsumer.sol";
 import { ERC20Helper } from "../modules/erc20-helper/src/ERC20Helper.sol";
 
 import { IMaplePoolDelegateCover } from "./interfaces/IMaplePoolDelegateCover.sol";
@@ -16,7 +17,7 @@ import { IMaplePoolDelegateCover } from "./interfaces/IMaplePoolDelegateCover.so
 
 */
 
-contract MaplePoolDelegateCover is IMaplePoolDelegateCover {
+contract MaplePoolDelegateCover is VennFirewallConsumer, IMaplePoolDelegateCover {
 
     address public override asset;
     address public override poolManager;
@@ -26,7 +27,7 @@ contract MaplePoolDelegateCover is IMaplePoolDelegateCover {
         require((asset       = asset_)       != address(0), "PDC:C:ZERO_A_ADDRESS");
     }
 
-    function moveFunds(uint256 amount_, address recipient_) external override {
+    function moveFunds(uint256 amount_, address recipient_) external override firewallProtected {
         require(msg.sender == poolManager,                        "PDC:MF:NOT_MANAGER");
         require(ERC20Helper.transfer(asset, recipient_, amount_), "PDC:MF:TRANSFER_FAILED");
     }

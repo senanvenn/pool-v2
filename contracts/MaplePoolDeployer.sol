@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.7;
 
+import {VennFirewallConsumer} from "@ironblocks/firewall-consumer/contracts/consumers/VennFirewallConsumer.sol";
 import { ERC20Helper }        from "../modules/erc20-helper/src/ERC20Helper.sol";
 import { IMapleProxyFactory } from "../modules/maple-proxy-factory/contracts/interfaces/IMapleProxyFactory.sol";
 
@@ -26,7 +27,7 @@ import { IMaplePoolDeployer }             from "./interfaces/IMaplePoolDeployer.
 
 */
 
-contract MaplePoolDeployer is IMaplePoolDeployer {
+contract MaplePoolDeployer is VennFirewallConsumer, IMaplePoolDeployer {
 
     address public override globals;
 
@@ -44,7 +45,7 @@ contract MaplePoolDeployer is IMaplePoolDeployer {
         string     memory symbol_,
         uint256[7] memory configParams_
     )
-        external override
+        external override firewallProtected
         returns (address poolManager_)
     {
         IGlobalsLike globals_ = IGlobalsLike(globals);
@@ -102,7 +103,7 @@ contract MaplePoolDeployer is IMaplePoolDeployer {
         string     memory symbol_,
         uint256[4] memory configParams_
     )
-        external override
+        external override firewallProtected
         returns (address poolManager_)
     {
         IGlobalsLike globals_ = IGlobalsLike(globals);

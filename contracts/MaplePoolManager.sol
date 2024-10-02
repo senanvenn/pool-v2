@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.7;
 
+import {VennFirewallConsumer} from "@ironblocks/firewall-consumer/contracts/consumers/VennFirewallConsumer.sol";
 import { ERC20Helper }           from "../modules/erc20-helper/src/ERC20Helper.sol";
 import { IMapleProxyFactory }    from "../modules/maple-proxy-factory/contracts/interfaces/IMapleProxyFactory.sol";
 import { IMapleProxied }         from "../modules/maple-proxy-factory/contracts/interfaces/IMapleProxied.sol";
@@ -40,7 +41,7 @@ import { IMaplePoolManager } from "./interfaces/IMaplePoolManager.sol";
 
 */
 
-contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePoolManagerStorage {
+contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxiedInternals, MaplePoolManagerStorage {
 
     uint256 public constant HUNDRED_PERCENT = 100_0000;  // Four decimal precision.
 
@@ -94,18 +95,18 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
 
     // NOTE: Can't add whenProtocolNotPaused modifier here, as globals won't be set until
     //       initializer.initialize() is called, and this function is what triggers that initialization.
-    function migrate(address migrator_, bytes calldata arguments_) external override whenNotPaused {
+    function migrate(address migrator_, bytes calldata arguments_) external override whenNotPaused firewallProtected {
         require(msg.sender == _factory(),        "PM:M:NOT_FACTORY");
         require(_migrate(migrator_, arguments_), "PM:M:FAILED");
         require(poolDelegateCover != address(0), "PM:M:DELEGATE_NOT_SET");
     }
 
-    function setImplementation(address implementation_) external override whenNotPaused {
+    function setImplementation(address implementation_) external override whenNotPaused firewallProtected {
         require(msg.sender == _factory(), "PM:SI:NOT_FACTORY");
         _setImplementation(implementation_);
     }
 
-    function upgrade(uint256 version_, bytes calldata arguments_) external override whenNotPaused {
+    function upgrade(uint256 version_, bytes calldata arguments_) external override whenNotPaused firewallProtected {
         IGlobalsLike globals_ = IGlobalsLike(globals());
 
         if (msg.sender == poolDelegate) {
@@ -126,7 +127,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /**************************************************************************************************************************************/
 
     // NOTE: This function is always called atomically during the deployment process so a DoS attack is not possible.
-    function completeConfiguration() external override whenNotPaused onlyIfNotConfigured {
+    function completeConfiguration() external override whenNotPaused onlyIfNotConfigured firewallProtected {
         configured = true;
 
         emit PoolConfigurationComplete();
@@ -136,7 +137,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /*** Ownership Transfer Functions                                                                                                   ***/
     /**************************************************************************************************************************************/
 
-    function acceptPoolDelegate() external override whenNotPaused {
+    function acceptPoolDelegate() external override whenNotPaused firewallProtected {
         require(msg.sender == pendingPoolDelegate, "PM:APD:NOT_PENDING_PD");
 
         IGlobalsLike(globals()).transferOwnedPoolManager(poolDelegate, msg.sender);
@@ -147,7 +148,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
         pendingPoolDelegate = address(0);
     }
 
-    function setPendingPoolDelegate(address pendingPoolDelegate_) external override whenNotPaused onlyPoolDelegateOrProtocolAdmins {
+    function setPendingPoolDelegate(address pendingPoolDelegate_) external override whenNotPaused onlyPoolDelegateOrProtocolAdmins firewallProtected {
         pendingPoolDelegate = pendingPoolDelegate_;
 
         emit PendingDelegateSet(poolDelegate, pendingPoolDelegate_);
@@ -157,7 +158,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /*** Globals Admin Functions                                                                                                        ***/
     /**************************************************************************************************************************************/
 
-    function setActive(bool active_) external override whenNotPaused {
+    function setActive(bool active_) external override whenNotPaused firewallProtected {
         require(msg.sender == globals(), "PM:SA:NOT_GLOBALS");
         emit SetAsActive(active = active_);
     }
@@ -167,7 +168,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /**************************************************************************************************************************************/
 
     function addLoanManager(address loanManagerFactory_)
-        external override whenNotPaused onlyPoolDelegateOrNotConfigured returns (address loanManager_)
+        external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected returns (address loanManager_)
     {
         require(IGlobalsLike(globals()).isInstanceOf("LOAN_MANAGER_FACTORY", loanManagerFactory_), "PM:ALM:INVALID_FACTORY");
 
@@ -185,14 +186,14 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     }
 
     function setDelegateManagementFeeRate(uint256 delegateManagementFeeRate_)
-        external override whenNotPaused onlyPoolDelegateOrNotConfigured
+        external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected
     {
         require(delegateManagementFeeRate_ <= HUNDRED_PERCENT, "PM:SDMFR:OOB");
 
         emit DelegateManagementFeeRateSet(delegateManagementFeeRate = delegateManagementFeeRate_);
     }
 
-    function setIsLoanManager(address loanManager_, bool isLoanManager_) external override whenNotPaused onlyPoolDelegate {
+    function setIsLoanManager(address loanManager_, bool isLoanManager_) external override whenNotPaused onlyPoolDelegate firewallProtected {
         emit IsLoanManagerSet(loanManager_, isLoanManager[loanManager_] = isLoanManager_);
 
         // Check LoanManager is in the list.
@@ -204,11 +205,11 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
         revert("PM:SILM:INVALID_LM");
     }
 
-    function setLiquidityCap(uint256 liquidityCap_) external override whenNotPaused onlyPoolDelegateOrNotConfigured {
+    function setLiquidityCap(uint256 liquidityCap_) external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected {
         emit LiquidityCapSet(liquidityCap = liquidityCap_);
     }
 
-    function setWithdrawalManager(address withdrawalManager_) external override whenNotPaused onlyIfNotConfigured {
+    function setWithdrawalManager(address withdrawalManager_) external override whenNotPaused onlyIfNotConfigured firewallProtected {
         address factory_ = IMapleProxied(withdrawalManager_).factory();
 
         require(IGlobalsLike(globals()).isInstanceOf("WITHDRAWAL_MANAGER_FACTORY", factory_), "PM:SWM:INVALID_FACTORY");
@@ -217,7 +218,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
         emit WithdrawalManagerSet(withdrawalManager = withdrawalManager_);
     }
 
-    function setPoolPermissionManager(address poolPermissionManager_) external override whenNotPaused onlyPoolDelegateOrNotConfigured {
+    function setPoolPermissionManager(address poolPermissionManager_) external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected {
         require(IGlobalsLike(globals()).isInstanceOf("POOL_PERMISSION_MANAGER", poolPermissionManager_), "PM:SPPM:INVALID_INSTANCE");
 
         emit PoolPermissionManagerSet(poolPermissionManager = poolPermissionManager_);
@@ -227,7 +228,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /*** Funding Functions                                                                                                              ***/
     /**************************************************************************************************************************************/
 
-    function requestFunds(address destination_, uint256 principal_) external override whenNotPaused nonReentrant {
+    function requestFunds(address destination_, uint256 principal_) external override whenNotPaused nonReentrant firewallProtected {
         address asset_   = asset;
         address pool_    = pool;
         address factory_ = IMapleProxied(msg.sender).factory();
@@ -257,7 +258,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /*** Loan Default Functions                                                                                                         ***/
     /**************************************************************************************************************************************/
 
-    function finishCollateralLiquidation(address loan_) external override whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins {
+    function finishCollateralLiquidation(address loan_) external override whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins firewallProtected {
         ( uint256 losses_, uint256 platformFees_ ) = ILoanManagerLike(_getLoanManager(loan_)).finishCollateralLiquidation(loan_);
 
         _handleCover(losses_, platformFees_);
@@ -266,7 +267,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     }
 
     function triggerDefault(address loan_, address liquidatorFactory_)
-        external override whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins
+        external override whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins firewallProtected
     {
         require(IGlobalsLike(globals()).isInstanceOf("LIQUIDATOR_FACTORY", liquidatorFactory_), "PM:TD:NOT_FACTORY");
 
@@ -291,7 +292,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /**************************************************************************************************************************************/
 
     function processRedeem(uint256 shares_, address owner_, address sender_)
-        external override whenNotPaused nonReentrant onlyPool returns (uint256 redeemableShares_, uint256 resultingAssets_)
+        external override whenNotPaused nonReentrant onlyPool firewallProtected returns (uint256 redeemableShares_, uint256 resultingAssets_)
     {
         require(owner_ == sender_ || IPoolLike(pool).allowance(owner_, sender_) > 0, "PM:PR:NO_ALLOWANCE");
 
@@ -300,14 +301,14 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     }
 
     function processWithdraw(uint256 assets_, address owner_, address sender_)
-        external override whenNotPaused nonReentrant returns (uint256 redeemableShares_, uint256 resultingAssets_)
+        external override whenNotPaused nonReentrant firewallProtected returns (uint256 redeemableShares_, uint256 resultingAssets_)
     {
         assets_; owner_; sender_; redeemableShares_; resultingAssets_;  // Silence compiler warnings
         require(false, "PM:PW:NOT_ENABLED");
     }
 
     function removeShares(uint256 shares_, address owner_)
-        external override whenNotPaused nonReentrant onlyPool returns (uint256 sharesReturned_)
+        external override whenNotPaused nonReentrant onlyPool firewallProtected returns (uint256 sharesReturned_)
     {
         emit SharesRemoved(
             owner_,
@@ -315,7 +316,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
         );
     }
 
-    function requestRedeem(uint256 shares_, address owner_, address sender_) external override whenNotPaused nonReentrant onlyPool {
+    function requestRedeem(uint256 shares_, address owner_, address sender_) external override whenNotPaused nonReentrant onlyPool firewallProtected {
         address pool_ = pool;
 
         require(ERC20Helper.approve(pool_, withdrawalManager, shares_), "PM:RR:APPROVE_FAIL");
@@ -330,7 +331,7 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     }
 
     function requestWithdraw(uint256 shares_, uint256 assets_, address owner_, address sender_)
-        external override whenNotPaused nonReentrant
+        external override whenNotPaused nonReentrant firewallProtected
     {
         shares_; assets_; owner_; sender_;  // Silence compiler warnings
         require(false, "PM:RW:NOT_ENABLED");
@@ -340,12 +341,12 @@ contract MaplePoolManager is IMaplePoolManager, MapleProxiedInternals, MaplePool
     /*** Pool Delegate Cover Functions                                                                                                  ***/
     /**************************************************************************************************************************************/
 
-    function depositCover(uint256 amount_) external override whenNotPaused {
+    function depositCover(uint256 amount_) external override whenNotPaused firewallProtected {
         require(ERC20Helper.transferFrom(asset, msg.sender, poolDelegateCover, amount_), "PM:DC:TRANSFER_FAIL");
         emit CoverDeposited(amount_);
     }
 
-    function withdrawCover(uint256 amount_, address recipient_) external override whenNotPaused onlyPoolDelegate {
+    function withdrawCover(uint256 amount_, address recipient_) external override whenNotPaused onlyPoolDelegate firewallProtected {
         recipient_ = recipient_ == address(0) ? msg.sender : recipient_;
 
         IPoolDelegateCoverLike(poolDelegateCover).moveFunds(amount_, recipient_);
