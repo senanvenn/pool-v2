@@ -50,7 +50,7 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /**************************************************************************************************************************************/
 
     modifier nonReentrant() {
-        require(_locked == 1, "PM:LOCKED");
+        if (_locked != 1) revert PoolManagerLocked();
 
         _locked = 2;
 
@@ -95,26 +95,26 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
 
     // NOTE: Can't add whenProtocolNotPaused modifier here, as globals won't be set until
     //       initializer.initialize() is called, and this function is what triggers that initialization.
-    function migrate(address migrator_, bytes calldata arguments_) external override whenNotPaused firewallProtected {
-        require(msg.sender == _factory(),        "PM:M:NOT_FACTORY");
-        require(_migrate(migrator_, arguments_), "PM:M:FAILED");
-        require(poolDelegateCover != address(0), "PM:M:DELEGATE_NOT_SET");
+    function migrate(address migrator_, bytes calldata arguments_) external override whenNotPaused  {
+        if (msg.sender != _factory()) revert NotFactory();
+        if (!_migrate(migrator_, arguments_)) revert MigrationFailed();
+        if (poolDelegateCover == address(0)) revert DelegateNotSet();
     }
 
-    function setImplementation(address implementation_) external override whenNotPaused firewallProtected {
-        require(msg.sender == _factory(), "PM:SI:NOT_FACTORY");
+    function setImplementation(address implementation_) external override whenNotPaused  {
+        if (msg.sender != _factory()) revert NotFactory();
         _setImplementation(implementation_);
     }
 
-    function upgrade(uint256 version_, bytes calldata arguments_) external override whenNotPaused firewallProtected {
+    function upgrade(uint256 version_, bytes calldata arguments_) external override whenNotPaused  {
         IGlobalsLike globals_ = IGlobalsLike(globals());
 
         if (msg.sender == poolDelegate) {
-            require(globals_.isValidScheduledCall(msg.sender, address(this), "PM:UPGRADE", msg.data), "PM:U:INVALID_SCHED_CALL");
+            if (!globals_.isValidScheduledCall(msg.sender, address(this), "PM:UPGRADE", msg.data)) revert InvalidScheduledCall();
 
             globals_.unscheduleCall(msg.sender, "PM:UPGRADE", msg.data);
         } else {
-            require(msg.sender == globals_.securityAdmin(), "PM:U:NO_AUTH");
+            if (msg.sender != globals_.securityAdmin()) revert NotAuthorized();
         }
 
         emit Upgraded(version_, arguments_);
@@ -127,7 +127,7 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /**************************************************************************************************************************************/
 
     // NOTE: This function is always called atomically during the deployment process so a DoS attack is not possible.
-    function completeConfiguration() external override whenNotPaused onlyIfNotConfigured firewallProtected {
+    function completeConfiguration() external override whenNotPaused onlyIfNotConfigured  {
         configured = true;
 
         emit PoolConfigurationComplete();
@@ -138,7 +138,7 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /**************************************************************************************************************************************/
 
     function acceptPoolDelegate() external override whenNotPaused firewallProtected {
-        require(msg.sender == pendingPoolDelegate, "PM:APD:NOT_PENDING_PD");
+        if (msg.sender != pendingPoolDelegate) revert NotPendingPoolDelegate();
 
         IGlobalsLike(globals()).transferOwnedPoolManager(poolDelegate, msg.sender);
 
@@ -148,7 +148,7 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
         pendingPoolDelegate = address(0);
     }
 
-    function setPendingPoolDelegate(address pendingPoolDelegate_) external override whenNotPaused onlyPoolDelegateOrProtocolAdmins firewallProtected {
+    function setPendingPoolDelegate(address pendingPoolDelegate_) external override payable whenNotPaused onlyPoolDelegateOrProtocolAdmins  {
         pendingPoolDelegate = pendingPoolDelegate_;
 
         emit PendingDelegateSet(poolDelegate, pendingPoolDelegate_);
@@ -158,8 +158,8 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /*** Globals Admin Functions                                                                                                        ***/
     /**************************************************************************************************************************************/
 
-    function setActive(bool active_) external override whenNotPaused firewallProtected {
-        require(msg.sender == globals(), "PM:SA:NOT_GLOBALS");
+    function setActive(bool active_) external override whenNotPaused  {
+        if (msg.sender != globals()) revert NotGlobals();
         emit SetAsActive(active = active_);
     }
 
@@ -168,9 +168,9 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /**************************************************************************************************************************************/
 
     function addLoanManager(address loanManagerFactory_)
-        external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected returns (address loanManager_)
+        external override payable whenNotPaused onlyPoolDelegateOrNotConfigured returns (address loanManager_)
     {
-        require(IGlobalsLike(globals()).isInstanceOf("LOAN_MANAGER_FACTORY", loanManagerFactory_), "PM:ALM:INVALID_FACTORY");
+        if (!IGlobalsLike(globals()).isInstanceOf("LOAN_MANAGER_FACTORY", loanManagerFactory_)) revert InvalidLoanManagerFactory();
 
         // NOTE: If removing loan managers is allowed in the future, there will be a need to rethink salts here due to collisions.
         loanManager_ = IMapleProxyFactory(loanManagerFactory_).createInstance(
@@ -186,14 +186,14 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     }
 
     function setDelegateManagementFeeRate(uint256 delegateManagementFeeRate_)
-        external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected
+        external override payable whenNotPaused onlyPoolDelegateOrNotConfigured 
     {
-        require(delegateManagementFeeRate_ <= HUNDRED_PERCENT, "PM:SDMFR:OOB");
+        if (delegateManagementFeeRate_ > HUNDRED_PERCENT) revert DelegateManagementFeeRateOutOfBounds();
 
         emit DelegateManagementFeeRateSet(delegateManagementFeeRate = delegateManagementFeeRate_);
     }
 
-    function setIsLoanManager(address loanManager_, bool isLoanManager_) external override whenNotPaused onlyPoolDelegate firewallProtected {
+    function setIsLoanManager(address loanManager_, bool isLoanManager_) external override payable whenNotPaused onlyPoolDelegate firewallProtected {
         emit IsLoanManagerSet(loanManager_, isLoanManager[loanManager_] = isLoanManager_);
 
         // Check LoanManager is in the list.
@@ -202,24 +202,24 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
             if (loanManagerList[i_] == loanManager_) return;
         }
 
-        revert("PM:SILM:INVALID_LM");
+        revert InvalidLoanManager();
     }
 
-    function setLiquidityCap(uint256 liquidityCap_) external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected {
+    function setLiquidityCap(uint256 liquidityCap_) external override payable whenNotPaused onlyPoolDelegateOrNotConfigured  {
         emit LiquidityCapSet(liquidityCap = liquidityCap_);
     }
 
-    function setWithdrawalManager(address withdrawalManager_) external override whenNotPaused onlyIfNotConfigured firewallProtected {
+    function setWithdrawalManager(address withdrawalManager_) external override payable whenNotPaused onlyIfNotConfigured firewallProtected {
         address factory_ = IMapleProxied(withdrawalManager_).factory();
 
-        require(IGlobalsLike(globals()).isInstanceOf("WITHDRAWAL_MANAGER_FACTORY", factory_), "PM:SWM:INVALID_FACTORY");
-        require(IMapleProxyFactory(factory_).isInstance(withdrawalManager_),                  "PM:SWM:INVALID_INSTANCE");
+        if (!IGlobalsLike(globals()).isInstanceOf("WITHDRAWAL_MANAGER_FACTORY", factory_)) revert InvalidWithdrawalManagerFactory();
+        if (!IMapleProxyFactory(factory_).isInstance(withdrawalManager_)) revert InvalidWithdrawalManagerInstance();
 
         emit WithdrawalManagerSet(withdrawalManager = withdrawalManager_);
     }
 
-    function setPoolPermissionManager(address poolPermissionManager_) external override whenNotPaused onlyPoolDelegateOrNotConfigured firewallProtected {
-        require(IGlobalsLike(globals()).isInstanceOf("POOL_PERMISSION_MANAGER", poolPermissionManager_), "PM:SPPM:INVALID_INSTANCE");
+    function setPoolPermissionManager(address poolPermissionManager_) external override payable whenNotPaused onlyPoolDelegateOrNotConfigured  {
+        if (!IGlobalsLike(globals()).isInstanceOf("POOL_PERMISSION_MANAGER", poolPermissionManager_)) revert InvalidPoolPermissionManagerInstance();
 
         emit PoolPermissionManagerSet(poolPermissionManager = poolPermissionManager_);
     }
@@ -235,30 +235,27 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
 
         IGlobalsLike globals_ = IGlobalsLike(globals());
 
-        // NOTE: Do not need to check isInstance() as the LoanManager is added to the list on `addLoanManager()` or `configure()`.
-        require(principal_ != 0,                                         "PM:RF:INVALID_PRINCIPAL");
-        require(globals_.isInstanceOf("LOAN_MANAGER_FACTORY", factory_), "PM:RF:INVALID_FACTORY");
-        require(IMapleProxyFactory(factory_).isInstance(msg.sender),     "PM:RF:INVALID_INSTANCE");
-        require(isLoanManager[msg.sender],                               "PM:RF:NOT_LM");
-        require(IERC20Like(pool_).totalSupply() != 0,                    "PM:RF:ZERO_SUPPLY");
-        require(_hasSufficientCover(address(globals_), asset_),          "PM:RF:INSUFFICIENT_COVER");
+        if (principal_ == 0) revert InvalidPrincipal();
+        if (!globals_.isInstanceOf("LOAN_MANAGER_FACTORY", factory_)) revert InvalidFactory();
+        if (!IMapleProxyFactory(factory_).isInstance(msg.sender)) revert InvalidInstance();
+        if (!isLoanManager[msg.sender]) revert NotLoanManager();
+        if (IERC20Like(pool_).totalSupply() == 0) revert ZeroSupply();
+        if (!_hasSufficientCover(address(globals_), asset_)) revert InsufficientCover();
 
         // Fetching locked liquidity needs to be done prior to transferring the tokens.
         uint256 lockedLiquidity_ = IWithdrawalManagerLike(withdrawalManager).lockedLiquidity();
 
-        // Transfer the required principal.
-        require(destination_ != address(0),                                        "PM:RF:INVALID_DESTINATION");
-        require(ERC20Helper.transferFrom(asset_, pool_, destination_, principal_), "PM:RF:TRANSFER_FAIL");
+        if (destination_ == address(0)) revert InvalidDestination();
+        if (!ERC20Helper.transferFrom(asset_, pool_, destination_, principal_)) revert TransferFailed();
 
-        // The remaining liquidity in the pool must be greater or equal to the locked liquidity.
-        require(IERC20Like(asset_).balanceOf(pool_) >= lockedLiquidity_, "PM:RF:LOCKED_LIQUIDITY");
+        if (IERC20Like(asset_).balanceOf(pool_) < lockedLiquidity_) revert InsufficientLockedLiquidity();
     }
 
     /**************************************************************************************************************************************/
     /*** Loan Default Functions                                                                                                         ***/
     /**************************************************************************************************************************************/
 
-    function finishCollateralLiquidation(address loan_) external override whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins firewallProtected {
+    function finishCollateralLiquidation(address loan_) external override payable whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins firewallProtected {
         ( uint256 losses_, uint256 platformFees_ ) = ILoanManagerLike(_getLoanManager(loan_)).finishCollateralLiquidation(loan_);
 
         _handleCover(losses_, platformFees_);
@@ -267,9 +264,9 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     }
 
     function triggerDefault(address loan_, address liquidatorFactory_)
-        external override whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins firewallProtected
+        external override payable whenNotPaused nonReentrant onlyPoolDelegateOrProtocolAdmins firewallProtected
     {
-        require(IGlobalsLike(globals()).isInstanceOf("LIQUIDATOR_FACTORY", liquidatorFactory_), "PM:TD:NOT_FACTORY");
+        if (!IGlobalsLike(globals()).isInstanceOf("LIQUIDATOR_FACTORY", liquidatorFactory_)) revert InvalidLiquidatorFactory();
 
         (
             bool    liquidationComplete_,
@@ -292,9 +289,9 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /**************************************************************************************************************************************/
 
     function processRedeem(uint256 shares_, address owner_, address sender_)
-        external override whenNotPaused nonReentrant onlyPool firewallProtected returns (uint256 redeemableShares_, uint256 resultingAssets_)
+        external override whenNotPaused nonReentrant onlyPool  returns (uint256 redeemableShares_, uint256 resultingAssets_)
     {
-        require(owner_ == sender_ || IPoolLike(pool).allowance(owner_, sender_) > 0, "PM:PR:NO_ALLOWANCE");
+        if (owner_ != sender_ || IPoolLike(pool).allowance(owner_, sender_) == 0) revert NoAllowance();
 
         ( redeemableShares_, resultingAssets_ ) = IWithdrawalManagerLike(withdrawalManager).processExit(shares_, owner_);
         emit RedeemProcessed(owner_, redeemableShares_, resultingAssets_);
@@ -304,11 +301,11 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
         external override whenNotPaused nonReentrant firewallProtected returns (uint256 redeemableShares_, uint256 resultingAssets_)
     {
         assets_; owner_; sender_; redeemableShares_; resultingAssets_;  // Silence compiler warnings
-        require(false, "PM:PW:NOT_ENABLED");
+        if (true) revert NotEnabled();
     }
 
     function removeShares(uint256 shares_, address owner_)
-        external override whenNotPaused nonReentrant onlyPool firewallProtected returns (uint256 sharesReturned_)
+        external override whenNotPaused nonReentrant onlyPool  returns (uint256 sharesReturned_)
     {
         emit SharesRemoved(
             owner_,
@@ -316,13 +313,13 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
         );
     }
 
-    function requestRedeem(uint256 shares_, address owner_, address sender_) external override whenNotPaused nonReentrant onlyPool firewallProtected {
+    function requestRedeem(uint256 shares_, address owner_, address sender_) external override whenNotPaused nonReentrant onlyPool  {
         address pool_ = pool;
 
-        require(ERC20Helper.approve(pool_, withdrawalManager, shares_), "PM:RR:APPROVE_FAIL");
+        if (!ERC20Helper.approve(pool_, withdrawalManager, shares_)) revert ApproveFailed();
 
         if (sender_ != owner_ && shares_ == 0) {
-            require(IPoolLike(pool_).allowance(owner_, sender_) > 0, "PM:RR:NO_ALLOWANCE");
+            if (IPoolLike(pool_).allowance(owner_, sender_) == 0) revert NoAllowance();
         }
 
         IWithdrawalManagerLike(withdrawalManager).addShares(shares_, owner_);
@@ -334,7 +331,7 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
         external override whenNotPaused nonReentrant firewallProtected
     {
         shares_; assets_; owner_; sender_;  // Silence compiler warnings
-        require(false, "PM:RW:NOT_ENABLED");
+        if (true) revert NotEnabled();
     }
 
     /**************************************************************************************************************************************/
@@ -342,19 +339,16 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     /**************************************************************************************************************************************/
 
     function depositCover(uint256 amount_) external override whenNotPaused firewallProtected {
-        require(ERC20Helper.transferFrom(asset, msg.sender, poolDelegateCover, amount_), "PM:DC:TRANSFER_FAIL");
+        if (!ERC20Helper.transferFrom(asset, msg.sender, poolDelegateCover, amount_)) revert TransferFailed();
         emit CoverDeposited(amount_);
     }
 
-    function withdrawCover(uint256 amount_, address recipient_) external override whenNotPaused onlyPoolDelegate firewallProtected {
+    function withdrawCover(uint256 amount_, address recipient_) external override whenNotPaused onlyPoolDelegate  {
         recipient_ = recipient_ == address(0) ? msg.sender : recipient_;
 
         IPoolDelegateCoverLike(poolDelegateCover).moveFunds(amount_, recipient_);
 
-        require(
-            IERC20Like(asset).balanceOf(poolDelegateCover) >= IGlobalsLike(globals()).minCoverAmount(address(this)),
-            "PM:WC:BELOW_MIN"
-        );
+        if (IERC20Like(asset).balanceOf(poolDelegateCover) < IGlobalsLike(globals()).minCoverAmount(address(this))) revert InsufficientCover();
 
         emit CoverWithdrawn(amount_);
     }
@@ -514,7 +508,7 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     function _getLoanManager(address loan_) internal view returns (address loanManager_) {
         loanManager_ = ILoanLike(loan_).lender();
 
-        require(isLoanManager[loanManager_], "PM:GLM:INVALID_LOAN_MANAGER");
+        if (!isLoanManager[loanManager_]) revert InvalidLoanManager();
     }
 
     function _handleCover(uint256 losses_, uint256 platformFees_) internal {
@@ -576,32 +570,65 @@ contract MaplePoolManager is VennFirewallConsumer, IMaplePoolManager, MapleProxi
     }
 
     function _revertIfConfigured() internal view {
-        require(!configured, "PM:ALREADY_CONFIGURED");
+        if (configured) revert AlreadyConfigured();
     }
 
     function _revertIfConfiguredAndNotPoolDelegate() internal view {
-        require(!configured || msg.sender == poolDelegate, "PM:NO_AUTH");
+        if (configured || msg.sender != poolDelegate) revert NotAuthorized();
     }
 
     function _revertIfNotPool() internal view {
-        require(msg.sender == pool, "PM:NOT_POOL");
+        if (msg.sender != pool) revert NotPool();
     }
 
     function _revertIfNotPoolDelegate() internal view {
-        require(msg.sender == poolDelegate, "PM:NOT_PD");
+        if (msg.sender != poolDelegate) revert NotPoolDelegate();
     }
 
     function _revertIfNeitherPoolDelegateNorProtocolAdmins() internal view {
-        require(
-            msg.sender == poolDelegate ||
-            msg.sender == governor()   ||
-            msg.sender == IGlobalsLike(globals()).operationalAdmin(),
-            "PM:NOT_PD_OR_GOV_OR_OA"
-        );
+        if (
+            msg.sender != poolDelegate ||
+            msg.sender != governor() ||
+            msg.sender != IGlobalsLike(globals()).operationalAdmin()
+        ) revert NotPoolDelegateOrGovernorOrOperationalAdmin();
     }
 
     function _revertIfPaused() internal view {
-        require(!IGlobalsLike(globals()).isFunctionPaused(msg.sig), "PM:PAUSED");
+        if (IGlobalsLike(globals()).isFunctionPaused(msg.sig)) revert Paused();
     }
 
 }
+
+// Add these custom error definitions at the end of the file
+error PoolManagerLocked();
+error NotFactory();
+error MigrationFailed();
+error DelegateNotSet();
+error InvalidScheduledCall();
+error NotAuthorized();
+error InvalidPrincipal();
+error InvalidFactory();
+error InvalidInstance();
+error NotLoanManager();
+error ZeroSupply();
+error InsufficientCover();
+error InvalidDestination();
+error TransferFailed();
+error InsufficientLockedLiquidity();
+error DelegateManagementFeeRateOutOfBounds();
+error InvalidLoanManager();
+error InvalidWithdrawalManagerFactory();
+error InvalidWithdrawalManagerInstance();
+error InvalidPoolPermissionManagerInstance();
+error InvalidLiquidatorFactory();
+error Paused();
+error NotPendingPoolDelegate();
+error NotGlobals();
+error InvalidLoanManagerFactory();
+error AlreadyConfigured();
+error NotPool();
+error NotPoolDelegate();
+error NotPoolDelegateOrGovernorOrOperationalAdmin();
+error NoAllowance();
+error NotEnabled();
+error ApproveFailed();

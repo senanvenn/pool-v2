@@ -77,7 +77,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
     /*** LP Functions                                                                                                                   ***/
     /**************************************************************************************************************************************/
 
-    function deposit(uint256 assets_, address receiver_) external override nonReentrant checkCall( firewallProtected"P:deposit") returns (uint256 shares_) {
+    function deposit(uint256 assets_, address receiver_) external override nonReentrant checkCall("P:deposit") firewallProtected returns (uint256 shares_) {
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
@@ -89,13 +89,13 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
         bytes32 r_,
         bytes32 s_
     )
-        external override nonReentrant checkCall( firewallProtected"P:depositWithPermit") returns (uint256 shares_)
+        external override nonReentrant checkCall("P:depositWithPermit") firewallProtected returns (uint256 shares_)
     {
         ERC20(asset).permit(msg.sender, address(this), assets_, deadline_, v_, r_, s_);
         _mint(shares_ = previewDeposit(assets_), assets_, receiver_, msg.sender);
     }
 
-    function mint(uint256 shares_, address receiver_) external override nonReentrant checkCall( firewallProtected"P:mint") returns (uint256 assets_) {
+    function mint(uint256 shares_, address receiver_) external override nonReentrant checkCall("P:mint") firewallProtected returns (uint256 assets_) {
         _mint(shares_, assets_ = previewMint(shares_), receiver_, msg.sender);
     }
 
@@ -108,7 +108,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
         bytes32 r_,
         bytes32 s_
     )
-        external override nonReentrant checkCall( firewallProtected"P:mintWithPermit") returns (uint256 assets_)
+        external override nonReentrant checkCall("P:mintWithPermit") firewallProtected returns (uint256 assets_)
     {
         require((assets_ = previewMint(shares_)) <= maxAssets_, "P:MWP:INSUFFICIENT_PERMIT");
 
@@ -117,7 +117,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
     }
 
     function redeem(uint256 shares_, address receiver_, address owner_)
-        external override nonReentrant checkCall( firewallProtected"P:redeem") returns (uint256 assets_)
+        external override nonReentrant checkCall("P:redeem") firewallProtected returns (uint256 assets_)
     {
         uint256 redeemableShares_;
         ( redeemableShares_, assets_ ) = IPoolManagerLike(manager).processRedeem(shares_, owner_, msg.sender);
@@ -125,7 +125,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
     }
 
     function withdraw(uint256 assets_, address receiver_, address owner_)
-        external override nonReentrant checkCall( firewallProtected"P:withdraw") returns (uint256 shares_)
+        external override nonReentrant checkCall("P:withdraw") firewallProtected returns (uint256 shares_)
     {
         ( shares_, assets_ ) = IPoolManagerLike(manager).processWithdraw(assets_, owner_, msg.sender);
         _burn(shares_, assets_, receiver_, owner_, msg.sender);
@@ -159,7 +159,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
     /**************************************************************************************************************************************/
 
     function removeShares(uint256 shares_, address owner_)
-        external override nonReentrant checkCall( firewallProtected"P:removeShares") returns (uint256 sharesReturned_)
+        external override nonReentrant checkCall("P:removeShares") firewallProtected returns (uint256 sharesReturned_)
     {
         if (msg.sender != owner_) _decreaseAllowance(owner_, msg.sender, shares_);
 
@@ -170,7 +170,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
     }
 
     function requestRedeem(uint256 shares_, address owner_)
-        external override nonReentrant checkCall( firewallProtected"P:requestRedeem") returns (uint256 escrowedShares_)
+        external override nonReentrant checkCall("P:requestRedeem") firewallProtected returns (uint256 escrowedShares_)
     {
         emit RedemptionRequested(
             owner_,
@@ -180,7 +180,7 @@ contract MaplePool is VennFirewallConsumer, IMaplePool, ERC20 {
     }
 
     function requestWithdraw(uint256 assets_, address owner_)
-        external override nonReentrant checkCall( firewallProtected"P:requestWithdraw") returns (uint256 escrowedShares_)
+        external override nonReentrant checkCall("P:requestWithdraw") firewallProtected returns (uint256 escrowedShares_)
     {
         emit WithdrawRequested(
             owner_,

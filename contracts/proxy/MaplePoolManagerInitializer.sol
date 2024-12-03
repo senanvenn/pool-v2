@@ -10,6 +10,13 @@ import { MaplePoolManagerStorage } from "./MaplePoolManagerStorage.sol";
 
 contract MaplePoolManagerInitializer is IMaplePoolManagerInitializer, MaplePoolManagerStorage {
 
+    error ZeroPoolDelegate();
+    error ZeroAsset();
+    error NotPoolDelegate();
+    error AlreadyPoolOwner();
+    error AssetNotAllowed();
+    error InvalidPoolParams();
+
     function decodeArguments(bytes calldata encodedArguments_) public pure override
         returns (
             address poolDelegate_,
@@ -63,16 +70,19 @@ contract MaplePoolManagerInitializer is IMaplePoolManagerInitializer, MaplePoolM
     ) internal {
         address globals_ = IMapleProxyFactoryLike(msg.sender).mapleGlobals();
 
-        require((poolDelegate = poolDelegate_) != address(0), "PMI:I:ZERO_PD");
-        require((asset = asset_)               != address(0), "PMI:I:ZERO_ASSET");
+        if ((poolDelegate = poolDelegate_) == address(0)) revert ZeroPoolDelegate();
+        if ((asset = asset_) == address(0)) revert ZeroAsset();
 
-        require(IGlobalsLike(globals_).isPoolDelegate(poolDelegate_),                 "PMI:I:NOT_PD");
-        require(IGlobalsLike(globals_).ownedPoolManager(poolDelegate_) == address(0), "PMI:I:POOL_OWNER");
-        require(IGlobalsLike(globals_).isPoolAsset(asset_),                           "PMI:I:ASSET_NOT_ALLOWED");
+        if (!IGlobalsLike(globals_).isPoolDelegate(poolDelegate_)) revert NotPoolDelegate();
+        if (IGlobalsLike(globals_).ownedPoolManager(poolDelegate_) != address(0)) revert AlreadyPoolOwner();
+        if (!IGlobalsLike(globals_).isPoolAsset(asset_)) revert AssetNotAllowed();
 
         address migrationAdmin_ = IGlobalsLike(globals_).migrationAdmin();
 
-        require(initialSupply_ == 0 || migrationAdmin_ != address(0), "PMI:I:INVALID_POOL_PARAMS");
+        if (initialSupply_ != 0 || migrationAdmin_ == address(0)) revert InvalidPoolParams();
+
+        poolDelegate = poolDelegate_;
+        asset = asset_;
 
         pool = address(
             new MaplePool(

@@ -1,8 +1,7 @@
-
-@ironblocks/firewall-consumer/=lib/ironblocks/onchain-firewall/packages/firewall-consumer/
-@openzeppelin/=lib/openzeppelin-contracts/
-ds-test/=lib/openzeppelin-contracts/lib/forge-std/lib/ds-test/src/
-erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
-forge-std/=lib/forge-std/src/
-openzeppelin-contracts/=lib/openzeppelin-contracts/
-openzeppelin/=lib/openzeppelin-contracts/contracts/
+@ironblocks/firewall-consumer/=modules/ironblocks/onchain-firewall/packages/firewall-consumer/
+@openzeppelin/=modules/openzeppelin-contracts/
+ds-test/=modules/forge-std/lib/ds-test/src/
+erc4626-tests/=modules/openzeppelin-contracts/lib/erc4626-tests/
+forge-std/=modules/forge-std/src/
+openzeppelin-contracts/=modules/openzeppelin-contracts/
+openzeppelin/=modules/openzeppelin-contracts/contracts/

@@ -148,7 +148,7 @@ interface IMaplePoolManager is IMapleProxied, IMaplePoolManagerStorage {
      *  @dev   Sets an address as the pending pool delegate.
      *  @param pendingPoolDelegate_ The address of the new pool delegate.
      */
-    function setPendingPoolDelegate(address pendingPoolDelegate_) external;
+    function setPendingPoolDelegate(address pendingPoolDelegate_) external payable;
 
     /**************************************************************************************************************************************/
     /*** Administrative Functions                                                                                                       ***/
@@ -159,7 +159,7 @@ interface IMaplePoolManager is IMapleProxied, IMaplePoolManagerStorage {
      *  @param  loanManagerFactory_ The address of the loan manager factory to use.
      *  @return loanManager_        The address of the new loan manager.
      */
-    function addLoanManager(address loanManagerFactory_) external returns (address loanManager_);
+    function addLoanManager(address loanManagerFactory_) external payable returns (address loanManager_);
 
     /**
      *  @dev Complete the configuration.
@@ -176,32 +176,32 @@ interface IMaplePoolManager is IMapleProxied, IMaplePoolManagerStorage {
      *  @dev   Sets the value for the delegate management fee rate.
      *  @param delegateManagementFeeRate_ The value for the delegate management fee rate.
      */
-    function setDelegateManagementFeeRate(uint256 delegateManagementFeeRate_) external;
+    function setDelegateManagementFeeRate(uint256 delegateManagementFeeRate_) external payable;
 
     /**
      *  @dev   Sets if the loanManager is valid in the isLoanManager mapping.
      *  @param loanManager_   The address of the loanManager
      *  @param isLoanManager_ Whether the loanManager is valid.
      */
-    function setIsLoanManager(address loanManager_, bool isLoanManager_) external;
+    function setIsLoanManager(address loanManager_, bool isLoanManager_) external payable;
 
     /**
      *  @dev   Sets the value for liquidity cap.
      *  @param liquidityCap_ The value for liquidity cap.
      */
-    function setLiquidityCap(uint256 liquidityCap_) external;
+    function setLiquidityCap(uint256 liquidityCap_) external payable;
 
     /**
      *  @dev   Sets the address of the pool permission manager.
      *  @param poolPermission_ The address of the pool permission manager.
      */
-    function setPoolPermissionManager(address poolPermission_) external;
+    function setPoolPermissionManager(address poolPermission_) external payable;
 
     /**
      *  @dev   Sets the address of the withdrawal manager.
      *  @param withdrawalManager_ The address of the withdrawal manager.
      */
-    function setWithdrawalManager(address withdrawalManager_) external;
+    function setWithdrawalManager(address withdrawalManager_) external payable;
 
     /**************************************************************************************************************************************/
     /*** Funding Functions                                                                                                              ***/
@@ -222,14 +222,14 @@ interface IMaplePoolManager is IMapleProxied, IMaplePoolManagerStorage {
      *  @dev   Finishes the collateral liquidation
      *  @param loan_ Loan that had its collateral liquidated.
      */
-    function finishCollateralLiquidation(address loan_) external;
+    function finishCollateralLiquidation(address loan_) external payable;
 
     /**
      *  @dev   Triggers the default of a loan.
      *  @param loan_              Loan to trigger the default.
      *  @param liquidatorFactory_ Factory used to deploy the liquidator.
      */
-    function triggerDefault(address loan_, address liquidatorFactory_) external;
+    function triggerDefault(address loan_, address liquidatorFactory_) external payable;
 
     /**************************************************************************************************************************************/
     /*** Exit Functions                                                                                                                 ***/
